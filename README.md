@@ -33,6 +33,7 @@ This is a personal fork of [dutkiewiczmaciej/MakLock](https://github.com/dutkiew
 | **App with no window yet** | n/a | A small placeholder card appears at the window's last position and snaps onto the real window when it opens |
 | **Backing out** | Panic key only (which unlocks) | **Cancel** button and **Esc** drop the lock *without* unlocking and hide the app, for accidental Dock clicks |
 | **60 s overlay timeout** | Unlocks the app | Cancels the lock and hides the app instead |
+| **Idle / sleep / Watch out of range** | Prompt for every running protected app | Only clear unlock state; the prompt appears for the app you're in, others prompt when you open them. Idle fires once per idle period |
 | **Background apps** | Contents visible until you switch to them | Locked apps stay blurred in the background (shield); clicking one starts the unlock |
 | **Mission Control** | Locked windows appear unblurred | Locked apps are hidden while Mission Control is open; unlocked apps still show |
 | **Lock latency** | -- | Also reacts to un-hide, starts Touch ID sooner, shorter card animation, cached icons |

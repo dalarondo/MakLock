@@ -116,10 +116,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Lock / Close Helpers
 
-    /// Lock or close all running protected apps.
-    /// Apps with autoClose → forceTerminate. Others → overlay (if showOverlays is true).
+    /// Lock or close all running protected apps (idle, sleep, Watch out of range).
+    /// Apps with autoClose → forceTerminate. Every other app is re-locked by clearing its
+    /// unlock state; the background shield covers it and the Touch ID prompt appears when you
+    /// actually open it. Only the app you are in right now gets the prompt immediately
+    /// (if showOverlays is true), so a lock never pops up for an app you aren't using.
     private func lockOrCloseProtectedApps(showOverlays: Bool = true) {
         AppMonitorService.shared.clearAllAuthentications()
+        let frontmostID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let runningBundleIDs = Set(NSWorkspace.shared.runningApplications.map(\.bundleIdentifier))
         let apps = ProtectedAppsManager.shared.apps.filter {
             $0.isEnabled && runningBundleIDs.contains($0.bundleIdentifier)
@@ -134,7 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     running.forceTerminate()
                     NSLog("[MakLock] Auto-closed: %@ (%@)", app.name, app.bundleIdentifier)
                 }
-            } else if showOverlays {
+            } else if showOverlays && app.bundleIdentifier == frontmostID {
                 OverlayWindowService.shared.show(for: app)
                 showedOverlay = true
             }

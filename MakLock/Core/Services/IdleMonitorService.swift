@@ -9,6 +9,9 @@ final class IdleMonitorService {
     var onIdleTimeoutReached: (() -> Void)?
 
     private var timer: Timer?
+    /// Fire once per idle period; re-arms when the user is active again. Without this the
+    /// callback repeated every check, re-prompting right after a cancel.
+    private var hasFiredThisIdlePeriod = false
     private let checkInterval: TimeInterval = 10
 
     private init() {}
@@ -16,6 +19,7 @@ final class IdleMonitorService {
     /// Start monitoring idle time with the given timeout in minutes.
     func startMonitoring() {
         stopMonitoring()
+        hasFiredThisIdlePeriod = false
 
         timer = Timer.scheduledTimer(withTimeInterval: checkInterval, repeats: true) { [weak self] _ in
             self?.checkIdleTime()
@@ -44,7 +48,12 @@ final class IdleMonitorService {
         let timeoutSeconds = TimeInterval(settings.idleTimeoutMinutes) * 60
         let idleSeconds = systemIdleTime()
 
-        if idleSeconds >= timeoutSeconds {
+        guard idleSeconds >= timeoutSeconds else {
+            hasFiredThisIdlePeriod = false
+            return
+        }
+        if !hasFiredThisIdlePeriod {
+            hasFiredThisIdlePeriod = true
             NSLog("[MakLock] Idle timeout reached (%.0fs idle, %.0fs threshold)", idleSeconds, timeoutSeconds)
             onIdleTimeoutReached?()
         }

@@ -20,6 +20,45 @@
 
 ---
 
+## About this fork
+
+This is a personal fork of [dutkiewiczmaciej/MakLock](https://github.com/dutkiewiczmaciej/MakLock) that turns it into an **always-locked** app locker. The changes live on the `always-locked-per-window` branch; `main` is kept identical to upstream.
+
+### What's different from upstream
+
+| Area | Upstream | This fork |
+|------|----------|-----------|
+| **When an app locks** | Unlocked until the app quits, or idle / sleep | Re-locks the moment you switch away, so every return (Dock click, Cmd+Tab) needs auth again |
+| **Overlay** | Full-screen blur on every monitor | Blur and unlock card cover **only the locked app's windows**, following them as they move, resize, or open |
+| **App with no window yet** | n/a | A small placeholder card appears at the window's last position and snaps onto the real window when it opens |
+| **Backing out** | Panic key only (which unlocks) | **Cancel** button and **Esc** drop the lock *without* unlocking and hide the app, for accidental Dock clicks |
+| **60 s overlay timeout** | Unlocks the app | Cancels the lock and hides the app instead |
+| **Background apps** | Contents visible until you switch to them | Locked apps stay blurred in the background (shield); clicking one starts the unlock |
+| **Mission Control** | Locked windows appear unblurred | Locked apps are hidden while Mission Control is open; unlocked apps still show |
+| **Lock latency** | -- | Also reacts to un-hide, starts Touch ID sooner, shorter card animation, cached icons |
+| **Settings** | -- | Menu bar popover toggles for lock-on-leave, background blur, and hiding in Mission Control (all on by default) |
+
+### Known limitations
+
+- macOS gives apps no way to pause another app's launch or activation, so the lock lands just after the app comes forward; a window can flash for a moment. Stopping that would need Apple's Endpoint Security entitlement.
+- Mission Control and Exposé show real window snapshots, which is why locked apps are hidden there instead of blurred.
+- Builds from this fork are ad-hoc signed, not notarized, and Sparkle auto-update or `brew upgrade` will replace them with the stock release.
+
+### Installing this fork
+
+Only building from source installs these changes (the DMG and Homebrew cask are upstream's):
+
+```bash
+git clone -b always-locked-per-window https://github.com/dalarondo/MakLock.git
+cd MakLock
+xcodebuild -project MakLock.xcodeproj -scheme MakLock -configuration Release \
+  CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build
+```
+
+Then copy the built `MakLock.app` to `/Applications` and re-sign it with `codesign --force --deep -s - /Applications/MakLock.app`.
+
+---
+
 ## What is MakLock?
 
 MakLock is a lightweight menu bar app that protects your macOS applications with Touch ID, Apple Watch proximity, or a backup password. When someone tries to open or switch to a protected app, MakLock blocks access with a blur overlay and requires authentication.
@@ -60,6 +99,8 @@ AppLocker (App Store) is sandboxed — it can only intercept app launches, not a
 - [x] Close protected apps on sleep (privacy on shared laptops)
 - [x] Menu bar app (no Dock icon, runs silently)
 - [x] Panic key emergency exit (`Cmd+Opt+Shift+Ctrl+U`)
+- [x] Esc / Cancel to back out of a lock without unlocking *(this fork)*
+- [x] Per-window overlay, background shield, Mission Control hiding *(this fork)*
 - [x] System app blacklist (Terminal, Xcode, etc. can never be locked)
 - [x] Multi-monitor support
 - [x] First launch onboarding

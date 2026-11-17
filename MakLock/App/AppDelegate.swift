@@ -1,5 +1,4 @@
 import AppKit
-import UserNotifications
 
 /// Application delegate responsible for lifecycle and menu bar setup.
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -11,9 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Initialize Sparkle auto-updater
         UpdateService.shared.start()
-
-        // Request notification permission (for Watch unlock notifications)
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
 
         // Show onboarding on first launch
         OnboardingWindowController.shared.showIfNeeded()
@@ -38,7 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if watchCanUnlock {
                 AppMonitorService.shared.markAuthenticated(app.bundleIdentifier)
                 WatchUnlockToast.shared.show(for: app.bundleIdentifier)
-                Self.sendWatchUnlockNotification(appName: app.name)
                 return
             }
             OverlayWindowService.shared.show(for: app)
@@ -46,9 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Update icon when overlay is dismissed after successful auth
-        OverlayWindowService.shared.onUnlocked = { [weak self] appName in
+        OverlayWindowService.shared.onUnlocked = { [weak self] _ in
             self?.menuBarController.iconState = .active
-            Self.sendUnlockNotification(appName: appName)
         }
 
         // Keep locked apps blurred even while they sit in the background
@@ -108,10 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Only auto-unlock if Watch is on wrist (unlocked)
             guard WatchProximityService.shared.isWatchUnlocked ?? true else { return }
             let lockedBundleID = OverlayWindowService.shared.currentBundleIdentifier
-            let lockedAppName = OverlayWindowService.shared.currentAppName
             OverlayWindowService.shared.hide()
             WatchUnlockToast.shared.show(for: lockedBundleID)
-            Self.sendWatchUnlockNotification(appName: lockedAppName ?? "app")
             self?.menuBarController.iconState = .active
         }
 
@@ -177,31 +169,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("[MakLock] Auto-closed on wake: %@ (%@)", app.name, app.bundleIdentifier)
             }
         }
-    }
-
-    // MARK: - Notifications
-
-    /// Post a local notification when Watch auto-unlocks an app.
-    static func sendWatchUnlockNotification(appName: String) {
-        sendNotification(title: "Unlocked", body: "Apple Watch unlocked \(appName)")
-    }
-
-    /// Post a local notification when Touch ID or password unlocks an app.
-    static func sendUnlockNotification(appName: String) {
-        sendNotification(title: "Unlocked", body: "\(appName) unlocked with Touch ID")
-    }
-
-    private static func sendNotification(title: String, body: String) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = nil
-
-        let request = UNNotificationRequest(
-            identifier: "maklock-\(UUID().uuidString)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
     }
 }

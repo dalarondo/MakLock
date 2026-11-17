@@ -26,11 +26,16 @@ struct AppIconView: View {
         .clipShape(RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous))
     }
 
+    private static let iconCache = NSCache<NSString, NSImage>()
+
     private var appIcon: NSImage? {
-        guard let bundleID = bundleIdentifier,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+        guard let bundleID = bundleIdentifier else { return nil }
+        if let cached = Self.iconCache.object(forKey: bundleID as NSString) { return cached }
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return nil
         }
-        return NSWorkspace.shared.icon(forFile: url.path)
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        Self.iconCache.setObject(icon, forKey: bundleID as NSString)
+        return icon
     }
 }

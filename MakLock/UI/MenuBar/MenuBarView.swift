@@ -7,6 +7,9 @@ struct MenuBarView: View {
     let onQuitClicked: () -> Void
 
     @State private var isProtectionEnabled = Defaults.shared.appSettings.isProtectionEnabled
+    @AppStorage(FeatureFlags.lockOnLeave) private var lockOnLeave = true
+    @AppStorage(FeatureFlags.backgroundShield) private var backgroundShield = true
+    @AppStorage(FeatureFlags.hideInMissionControl) private var hideInMissionControl = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -61,6 +64,17 @@ struct MenuBarView: View {
             Divider()
                 .padding(.horizontal, 8)
 
+            // Feature toggles
+            VStack(spacing: 2) {
+                FeatureToggleRow(title: "Lock when switching away", isOn: $lockOnLeave)
+                FeatureToggleRow(title: "Blur locked apps in background", isOn: $backgroundShield)
+                FeatureToggleRow(title: "Hide locked apps in Mission Control", isOn: $hideInMissionControl)
+            }
+            .padding(.vertical, 6)
+
+            Divider()
+                .padding(.horizontal, 8)
+
             // Actions
             MenuBarButton(title: "Settings...", icon: "gearshape") {
                 onSettingsClicked()
@@ -96,6 +110,28 @@ struct MenuBarView: View {
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+// MARK: - Feature Toggle Row
+
+private struct FeatureToggleRow: View {
+    let title: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(MakLockTypography.body)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer()
+            Toggle("", isOn: $isOn)
+                .toggleStyle(.goldSwitchSmall)
+                .labelsHidden()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 5)
     }
 }
 

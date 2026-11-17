@@ -4,7 +4,7 @@ import SwiftUI
 enum MakLockAnimations {
 
     /// Overlay appears — quick ease out
-    static let overlayAppear = Animation.easeOut(duration: 0.2)
+    static let overlayAppear = Animation.easeOut(duration: 0.08)
 
     /// Overlay disappears — quick ease in
     static let overlayDisappear = Animation.easeIn(duration: 0.15)

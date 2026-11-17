@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let menuBarController = MenuBarController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        FeatureFlags.registerDefaults()
         menuBarController.setup()
 
         // Initialize Sparkle auto-updater
@@ -48,6 +49,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         OverlayWindowService.shared.onUnlocked = { [weak self] appName in
             self?.menuBarController.iconState = .active
             Self.sendUnlockNotification(appName: appName)
+        }
+
+        // Keep locked apps blurred even while they sit in the background
+        ShieldService.shared.start()
+
+        // Lock removed without authenticating (Cancel, Esc, switched away, timeout)
+        OverlayWindowService.shared.onCancelled = { [weak self] in
+            self?.menuBarController.iconState = .active
         }
 
         // Start Watch proximity BEFORE app monitoring so Watch has time to connect.

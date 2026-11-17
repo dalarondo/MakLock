@@ -77,7 +77,17 @@ struct LockOverlayView: View {
                                 showPasswordInput = true
                             }
                         }
+
+                        // Accidental launch: drop the lock without unlocking and hide the app.
+                        SecondaryButton("Cancel") {
+                            OverlayWindowService.shared.cancelAndHide()
+                        }
                     }
+
+                    Text("Press Esc to cancel")
+                        .font(MakLockTypography.caption)
+                        .foregroundColor(MakLockColors.textSecondary)
+                        .padding(.top, 2)
 
                     // Dev mode skip button
                     #if DEBUG
@@ -106,7 +116,7 @@ struct LockOverlayView: View {
             }
             // Only the primary screen triggers Touch ID (prevents duplicate system prompts)
             if isPrimary {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                DispatchQueue.main.async {
                     attemptTouchID()
                 }
             }

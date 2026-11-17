@@ -27,7 +27,7 @@ final class MenuBarController {
         iconState = Defaults.shared.appSettings.isProtectionEnabled ? .active : .idle
 
         let popover = NSPopover()
-        popover.contentSize = NSSize(width: 260, height: 280)
+        popover.contentSize = NSSize(width: 260, height: 410)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(rootView: MenuBarView(
             onToggleProtection: { [weak self] in

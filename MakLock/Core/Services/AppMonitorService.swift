@@ -21,6 +21,8 @@ final class AppMonitorService: ObservableObject {
     /// Prevents checkRunningApps from triggering duplicate prompts.
     private var pendingLockBundleIDs: Set<String> = []
 
+    private var lastAuthTime: [String: Date] = [:]
+
     private init() {}
 
     /// Start monitoring app launches and activations.
@@ -37,6 +39,14 @@ final class AppMonitorService: ObservableObject {
 
         // Monitor app activations (switching to a running protected app)
         workspace.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
+            .compactMap { $0.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication }
+            .sink { [weak self] app in
+                self?.handleAppEvent(app)
+            }
+            .store(in: &cancellables)
+
+        // Monitor un-hide (Dock click on a hidden app) — can arrive before the activation
+        workspace.notificationCenter.publisher(for: NSWorkspace.didUnhideApplicationNotification)
             .compactMap { $0.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication }
             .sink { [weak self] app in
                 self?.handleAppEvent(app)
@@ -62,20 +72,46 @@ final class AppMonitorService: ObservableObject {
         workspace.notificationCenter.publisher(for: NSWorkspace.didDeactivateApplicationNotification)
             .compactMap { $0.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication }
             .sink { [weak self] app in
-                guard let bundleID = app.bundleIdentifier else { return }
-                guard self?.authenticatedApps.contains(bundleID) == true else { return }
+                guard let self, let bundleID = app.bundleIdentifier else { return }
 
-                // Delay to let window close animations finish
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    guard let self else { return }
-                    if app.isTerminated {
-                        self.authenticatedApps.remove(bundleID)
-                        self.pendingLockBundleIDs.remove(bundleID)
-                        NSLog("[MakLock] App terminated (deactivate check), auth cleared: %@", bundleID)
-                    } else if !app.isHidden && !self.appHasWindows(app) {
-                        self.authenticatedApps.remove(bundleID)
-                        self.pendingLockBundleIDs.remove(bundleID)
-                        NSLog("[MakLock] App quit (no windows), auth cleared: %@", bundleID)
+                // Ignore focus handoffs that aren't the user leaving the app:
+                // the system Touch ID dialog (an accessory process), MakLock itself,
+                // or a late notification after the app already became frontmost again.
+                if let front = NSWorkspace.shared.frontmostApplication {
+                    if front.processIdentifier == app.processIdentifier { return }
+                    if front.bundleIdentifier == Bundle.main.bundleIdentifier { return }
+                    if front.activationPolicy != .regular { return }
+                }
+
+                // User left an app whose lock is still up: tear the overlay down (no auth)
+                // so it can't block the next protected app, and re-lock on return.
+                if OverlayWindowService.shared.currentBundleIdentifier == bundleID {
+                    OverlayWindowService.shared.dismissWithoutAuth()
+                    self.pendingLockBundleIDs.remove(bundleID)
+                }
+
+                guard self.authenticatedApps.contains(bundleID) else { return }
+
+                // Brief grace period right after unlocking so the dialog hand-off
+                // can't immediately re-lock (prevents Touch ID prompt loops).
+                if let t = self.lastAuthTime[bundleID], Date().timeIntervalSince(t) < 1.0 { return }
+
+                if FeatureFlags.isOn(FeatureFlags.lockOnLeave) {
+                    // Always-locked mode: leaving a protected app re-locks it, so the
+                    // next activation (Dock icon click, Cmd+Tab, etc.) requires auth again.
+                    self.authenticatedApps.remove(bundleID)
+                    self.pendingLockBundleIDs.remove(bundleID)
+                    NSLog("[MakLock] App deactivated, re-locked: %@", bundleID)
+                } else {
+                    // Original behavior: stay unlocked until the app quits. Clear auth only when
+                    // it was quit but its process survives in the background (no windows left).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                        guard let self else { return }
+                        if app.isTerminated || (!app.isHidden && !self.appHasWindows(app)) {
+                            self.authenticatedApps.remove(bundleID)
+                            self.pendingLockBundleIDs.remove(bundleID)
+                            NSLog("[MakLock] App quit, auth cleared: %@", bundleID)
+                        }
                     }
                 }
             }
@@ -127,6 +163,7 @@ final class AppMonitorService: ObservableObject {
     /// Mark an app as authenticated. It stays unlocked until the app quits, idle, or sleep.
     func markAuthenticated(_ bundleIdentifier: String) {
         authenticatedApps.insert(bundleIdentifier)
+        lastAuthTime[bundleIdentifier] = Date()
         pendingLockBundleIDs.remove(bundleIdentifier)
         NSLog("[MakLock] App session authenticated: %@", bundleIdentifier)
     }
@@ -136,6 +173,27 @@ final class AppMonitorService: ObservableObject {
         authenticatedApps.removeAll()
         pendingLockBundleIDs.removeAll()
         NSLog("[MakLock] All app sessions cleared")
+    }
+
+    /// Lock a protected app on demand (click on its background shield).
+    func requestLock(for bundleIdentifier: String) {
+        guard let protectedApp = Defaults.shared.protectedApps.first(where: {
+            $0.bundleIdentifier == bundleIdentifier && $0.isEnabled
+        }) else { return }
+        guard Defaults.shared.appSettings.isProtectionEnabled,
+              !authenticatedApps.contains(bundleIdentifier),
+              !pendingLockBundleIDs.contains(bundleIdentifier),
+              !OverlayWindowService.shared.isShowing else { return }
+
+        pendingLockBundleIDs.insert(bundleIdentifier)
+        detectedApp = protectedApp
+        onProtectedAppDetected?(protectedApp)
+    }
+
+    /// Forget a pending lock prompt (user cancelled) so the next activation locks again.
+    func clearPending(_ bundleIdentifier: String) {
+        pendingLockBundleIDs.remove(bundleIdentifier)
+        authenticatedApps.remove(bundleIdentifier)
     }
 
     /// Clear authentication for a specific app.

@@ -75,6 +75,31 @@ enum WindowLister {
     }
 }
 
+/// Keeps closed overlay windows alive for a moment before they are freed.
+///
+/// Overlays are often closed from inside their own event handling: a click on a shield starts the
+/// lock, which closes that shield; the Cancel button closes the window it lives in; Esc and Touch ID
+/// callbacks tear windows down mid-callback. Freeing a window (and its view hierarchy) while one of
+/// its own methods is still on the stack leaves a dangling object that crashes later, when the main
+/// autorelease pool drains. Retiring the window hands the last reference to a later run-loop turn.
+enum WindowGraveyard {
+    private static var retired: [NSWindow] = []
+
+    static func retire(_ window: NSWindow) {
+        window.ignoresMouseEvents = true
+        window.close()
+        retired.append(window)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            retired.removeAll { $0 === window }
+        }
+    }
+
+    /// Hold any object (e.g. a hotkey whose handler is currently running) until the next turns.
+    static func retireObject(_ object: AnyObject) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { _ = object }
+    }
+}
+
 /// Blur layer that reports clicks instead of swallowing them.
 private final class ShieldView: NSVisualEffectView {
     var onClick: (() -> Void)?
@@ -127,13 +152,13 @@ final class ShieldService {
     /// Drop the shields of one app (its real lock overlay is taking over).
     func release(bundleIdentifier: String) {
         for (id, shield) in shields where shield.bundleID == bundleIdentifier {
-            shield.window.close()
+            WindowGraveyard.retire(shield.window)
             shields[id] = nil
         }
     }
 
     private func removeAll() {
-        shields.values.forEach { $0.window.close() }
+        shields.values.forEach { WindowGraveyard.retire($0.window) }
         shields.removeAll()
     }
 
@@ -190,7 +215,7 @@ final class ShieldService {
         }
 
         for (id, shield) in shields where !seen.contains(id) {
-            shield.window.close()
+            WindowGraveyard.retire(shield.window)
             shields[id] = nil
         }
     }

@@ -38,6 +38,7 @@ This is a personal fork of [dutkiewiczmaciej/MakLock](https://github.com/dutkiew
 | **Mission Control** | Locked windows appear unblurred | Locked apps are hidden while Mission Control is open; unlocked apps still show |
 | **Lock latency** | -- | Also reacts to un-hide, starts Touch ID sooner, shorter card animation, cached icons |
 | **Settings** | -- | Menu bar popover toggles for lock-on-leave, background blur, and hiding in Mission Control (all on by default) |
+| **Updates** | Sparkle checks the upstream appcast daily | **Disabled.** No feed URL is set and the updater never starts, so a stock build can't overwrite the fork. Update by rebuilding from this repo |
 
 ### Known limitations
 

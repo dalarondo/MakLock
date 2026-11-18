@@ -8,8 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         FeatureFlags.registerDefaults()
         menuBarController.setup()
 
-        // Initialize Sparkle auto-updater
-        UpdateService.shared.start()
+        // Auto-update is disabled in this fork (a stock upstream build would overwrite it)
+        UpdateService.start()
 
         // Show onboarding on first launch
         OnboardingWindowController.shared.showIfNeeded()

@@ -108,12 +108,15 @@ final class OverlayWindowService {
     private func teardown() {
         stopTimeoutTimer()
         stopTracking()
+        // Esc may be what triggered this teardown: don't free the hotkey inside its own handler.
+        if let hotKey = escapeHotKey { WindowGraveyard.retireObject(hotKey) }
         escapeHotKey = nil
 
         // Cancel any in-progress Touch ID evaluation
         AuthenticationService.shared.cancelAuthentication()
 
-        overlayWindows.forEach { $0.close() }
+        // Cancel/Touch ID callbacks run inside these windows' own views, so don't free them yet.
+        overlayWindows.forEach { WindowGraveyard.retire($0) }
         overlayWindows.removeAll()
         currentApp = nil
     }
@@ -258,7 +261,7 @@ final class OverlayWindowService {
         // Primary window (hosts the Touch ID / password UI) closed: rebuild so another
         // window (or a placeholder) takes over.
         if let primaryID = overlayWindows.first?.targetWindowID, !targetIDs.contains(primaryID) {
-            overlayWindows.forEach { $0.close() }
+            overlayWindows.forEach { WindowGraveyard.retire($0) }
             overlayWindows.removeAll()
             if targets.isEmpty {
                 createPlaceholderOverlay(for: app)
@@ -271,7 +274,7 @@ final class OverlayWindowService {
         // Drop overlays whose window closed.
         overlayWindows.removeAll { window in
             guard let id = window.targetWindowID, !targetIDs.contains(id) else { return false }
-            window.close()
+            WindowGraveyard.retire(window)
             return true
         }
 

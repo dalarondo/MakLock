@@ -76,14 +76,14 @@ struct GeneralSettingsView: View {
             }
 
             Section {
-                Button("Check for Updates…") {
-                    UpdateService.shared.updater.checkForUpdates()
-                }
+                Text("Automatic updates are off in this fork, so a stock MakLock build can't replace it.")
+                    .font(MakLockTypography.caption)
+                    .foregroundColor(MakLockColors.textSecondary)
 
                 HStack(spacing: 8) {
-                    Text("MakLock \(version) (\(build))  ·  Made by MakMak")
+                    Text("MakLock \(version) (\(build))  ·  Custom fork")
                         .foregroundColor(MakLockColors.textSecondary)
-                    Link(destination: URL(string: "https://github.com/dutkiewiczmaciej/MakLock")!) {
+                    Link(destination: UpdateService.forkURL) {
                         HStack(spacing: 3) {
                             Image(systemName: "arrow.up.right.square")
                             Text("GitHub")
